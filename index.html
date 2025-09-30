@@ -513,13 +513,11 @@
     </div>
 
     <script>        
-        // Configuration
         const CAMPUS_CENTER = { lat: 24.842822, lng: 93.939438 };
-        const CAMPUS_RADIUS = 3000; // 1000m for testing
+        const CAMPUS_RADIUS = 500; // 500m for testing
         const RECOGNITION_THRESHOLD = 0.6; // Face recognition confidence threshold
         const DETECTION_INTERVAL = 100; // Face detection interval in ms
 
-        // Global variables
         let faceApiLoaded = false;
         let labeledFaceDescriptors = [];
         let faceMatcher = null;
@@ -533,10 +531,8 @@
         let detectionInterval = null;
         let regDetectionInterval = null;
 
-        // Enhanced student database with face descriptors
         let STUDENTS_DB = {};
 
-        // Initialize face-api.js models
         async function loadFaceApiModels() {
             try {
                 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
@@ -562,7 +558,6 @@
             }
         }
 
-        // Create labeled face descriptors for recognition
         async function createLabeledFaceDescriptors() {
             const descriptions = [];
             
@@ -585,7 +580,6 @@
             }
         }
 
-        // Page switching
         function switchPage(page) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.page-btn').forEach(btn => btn.classList.remove('active'));
@@ -602,7 +596,6 @@
             document.getElementById('message').style.display = 'none';
         }
 
-        // Initialize the attendance system
         async function initializeSystem() {
             if (!faceApiLoaded) {
                 showMessage('❌ Face recognition models not loaded. Please wait and try again.', 'error');
@@ -621,7 +614,6 @@
             updateUI();
         }
 
-        // Verify location
         async function verifyLocation() {
             return new Promise((resolve) => {
                 if (!navigator.geolocation) {
@@ -664,7 +656,6 @@
             });
         }
 
-        // Initialize camera for attendance
         async function initializeCamera() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ 
@@ -695,7 +686,6 @@
             }
         }
 
-        // Start face detection for attendance
         async function startFaceDetection() {
             if (!faceApiLoaded || !cameraReady) return;
 
@@ -712,24 +702,19 @@
                         new faceapi.TinyFaceDetectorOptions()
                     ).withFaceLandmarks().withFaceDescriptors();
 
-                    // Clear previous drawings
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                     if (detections.length > 0) {
-                        // Draw face detections
                         detections.forEach((detection, i) => {
                             const { x, y, width, height } = detection.detection.box;
                             
-                            // Draw bounding box
                             ctx.strokeStyle = '#00ff00';
                             ctx.lineWidth = 3;
                             ctx.strokeRect(x, y, width, height);
 
-                            // Face recognition
                             if (faceMatcher && labeledFaceDescriptors.length > 0) {
                                 const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
                                 
-                                // Draw label
                                 ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
                                 ctx.fillRect(x, y - 35, width, 30);
                                 
@@ -741,14 +726,12 @@
                                     const confidence = Math.round((1 - bestMatch.distance) * 100);
                                     ctx.fillText(`${bestMatch.label} (${confidence}%)`, x + width/2, y - 10);
                                     
-                                    // Enable attendance button for recognized face
                                     if (confidence > 70) {
                                         document.getElementById('markAttendanceBtn').disabled = false;
                                         document.getElementById('recognitionStatus').className = 'recognition-status recognition-success';
                                         document.getElementById('recognitionStatus').textContent = 
                                             `✅ Face recognized: ${bestMatch.label} (${confidence}% confidence)`;
                                         
-                                        // Store current detection for attendance
                                         currentStudent = Object.values(STUDENTS_DB).find(s => s.name === bestMatch.label);
                                     }
                                 } else {
@@ -769,7 +752,6 @@
             }, DETECTION_INTERVAL);
         }
 
-        // Start registration camera
         async function startRegistrationCamera() {
             try {
                 regStream = await navigator.mediaDevices.getUserMedia({ 
@@ -784,8 +766,7 @@
                     document.getElementById('startCameraBtn').style.display = 'none';
                     document.getElementById('capturePhotoBtn').style.display = 'inline-block';
                     document.getElementById('cancelRegBtn').style.display = 'inline-block';
-                    
-                    // Setup detection canvas
+                   
                     const canvas = document.getElementById('regDetectionCanvas');
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
@@ -798,7 +779,6 @@
             }
         }
 
-        // Start face detection for registration
         async function startRegistrationDetection() {
             if (!faceApiLoaded) return;
 
@@ -821,12 +801,10 @@
                         const detection = detections[0];
                         const { x, y, width, height } = detection.detection.box;
                         
-                        // Draw green box for good detection
                         ctx.strokeStyle = '#00ff00';
                         ctx.lineWidth = 3;
                         ctx.strokeRect(x, y, width, height);
                         
-                        // Check face quality (size and position)
                         const faceSize = width * height;
                         const videoSize = video.videoWidth * video.videoHeight;
                         const faceRatio = faceSize / videoSize;
@@ -855,7 +833,6 @@
             }, DETECTION_INTERVAL);
         }
 
-        // Capture photo during registration
         async function capturePhoto() {
             const video = document.getElementById('regVideo');
             const canvas = document.getElementById('regCanvas');
@@ -865,10 +842,8 @@
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Save photo data
             capturedPhotoData = canvas.toDataURL('image/png');
 
-            // Extract face descriptor
             const detections = await faceapi.detectSingleFace(
                 video,
                 new faceapi.TinyFaceDetectorOptions()
@@ -1145,3 +1120,4 @@
     </script>
 </body>
 </html>
+
