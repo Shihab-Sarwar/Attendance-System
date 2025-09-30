@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance</title>
+    
+    <!-- Face-api.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .header {
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .page-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            border-radius: 50px;
+            padding: 5px;
+        }
+
+        .page-btn {
+            flex: 1;
+            padding: 15px 25px;
+            background: transparent;
+            border: none;
+            border-radius: 45px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #666;
+        }
+
+        .page-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #007bff;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 15px 0;
+        }
+
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+
+        .status-pending { background: #ffc107; }
+        .status-success { background: #28a745; }
+        .status-error { background: #dc3545; }
+
+        .video-container {
+            position: relative;
+            margin: 20px 0;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            display: inline-block;
+        }
+
+        #video, #regVideo {
+            width: 100%;
+            max-width: 480px;
+            height: 360px;
+            object-fit: cover;
+            background: #000;
+            border-radius: 15px;
+        }
+
+        .detection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        .face-box {
+            position: absolute;
+            border: 3px solid #00ff00;
+            border-radius: 5px;
+        }
+
+        .face-label {
+            position: absolute;
+            background: rgba(0, 255, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .confidence-bar {
+            position: absolute;
+            background: rgba(0, 255, 0, 0.3);
+            height: 4px;
+            border-radius: 2px;
+            top: -8px;
+            left: 0;
+        }
+
+        .form-group {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .photo-preview {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 3px solid #e0e0e0;
+            margin: 20px auto;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: #666;
+            overflow: hidden;
+        }
+
+        .photo-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            min-width: 150px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        }
+
+        .student-info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .student-photo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            background: #ddd;
+            overflow: hidden;
+        }
+
+        .student-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .existing-students {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .student-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .student-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .student-item:hover {
+            background-color: rgba(102, 126, 234, 0.1);
+        }
+
+        .student-item-photo {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin-right: 15px;
+            overflow: hidden;
+            background: #ddd;
+        }
+
+        .student-item-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .recognition-status {
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .recognition-success {
+            background: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+            border: 2px solid #28a745;
+        }
+
+        .recognition-failed {
+            background: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+            border: 2px solid #dc3545;
+        }
+
+        .recognition-processing {
+            background: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+            border: 2px solid #ffc107;
+        }
+
+        .canvas {
+            display: none;
+        }
+
+        .error {
+            border-left-color: #dc3545 !important;
+        }
+
+        .success {
+            border-left-color: #28a745 !important;
+        }
+
+        .success-animation {
+            animation: pulse 0.6s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <h3>Loading Face Recognition Models...</h3>
+        <p>Please wait while we initialize the system</p>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <img src="images/iiit-senapati.png" alt="IIIT Senapati Logo" width="120">
+            <h1>Smart Attendance</h1>
+            <p>Real-time geolocation and face detection attendance system</p>
+        </div>
+
+        <div class="page-selector">
+            <button class="page-btn active" onclick="switchPage('attendance')">📋 Mark Attendance</button>
+            <button class="page-btn" onclick="switchPage('register')">📝 Register</button>
+        </div>
+
+        <!-- Attendance Page -->
+        <div id="attendancePage" class="page active">
+            <div class="status-card">
+                <div class="status-item">
+                    <span>🤖 Face Recognition Models</span>
+                    <div class="status-indicator status-pending" id="modelsStatus"></div>
+                </div>
+                <div class="status-item">
+                    <span>📍 Location Verification</span>
+                    <div class="status-indicator status-pending" id="locationStatus"></div>
+                </div>
+                <div class="status-item">
+                    <span>📷 Camera Access</span>
+                    <div class="status-indicator status-pending" id="cameraStatus"></div>
+                </div>
+                <div class="distance-info" id="distanceInfo"></div>
+            </div>
+
+            <div class="recognition-status recognition-processing" id="recognitionStatus" style="display: none;">
+                🔍 Scanning for faces...
+            </div>
+
+            <div class="student-info" id="studentInfo" style="display: none;">
+                <div class="student-photo" id="studentPhoto"></div>
+                <h3 id="studentName">Student Name</h3>
+                <p id="studentId">Student ID: </p>
+                <p id="recognitionConfidence">Confidence: </p>
+            </div>
+
+            <div class="video-container" id="videoContainer" style="display: none;">
+                <video id="video" autoplay muted></video>
+                <canvas id="detectionCanvas" class="detection-overlay"></canvas>
+            </div>
+
+            <div class="controls">
+                <button class="btn" id="startBtn" onclick="initializeSystem()">
+                    🚀 Start Attendance System
+                </button>
+                <button class="btn btn-success" id="markAttendanceBtn" onclick="markAttendance()" style="display: none;" disabled>
+                    ✅ Mark Attendance
+                </button>
+                <button class="btn btn-danger" id="resetBtn" onclick="resetSystem()" style="display: none;">
+                    🔄 Reset System
+                </button>
+            </div>
+        </div>
+
+        <!-- Registration Page -->
+        <div id="registerPage" class="page">
+            <div class="existing-students">
+                <h3>👥 Registered Students (<span id="studentCount">0</span>)</h3>
+                <div class="student-list" id="studentList"></div>
+            </div>
+
+            <div class="registration-form">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #333;">Register New Student</h2>
+                
+                <div class="form-group">
+                    <label for="studentNameInput">Full Name *</label>
+                    <input type="text" id="studentNameInput" placeholder="Enter your full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentIdInput">Student ID *</label>
+                    <input type="text" id="studentIdInput" placeholder="Enter your student ID" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="emailInput">Email *</label>
+                    <input type="email" id="emailInput" placeholder="Enter your email">
+                </div>
+
+                <div class="photo-preview" id="photoPreview">📷</div>
+
+                <div class="recognition-status recognition-processing" id="regRecognitionStatus" style="display: none;">
+                    🔍 Capturing face data...
+                </div>
+
+                <div class="video-container" id="regVideoContainer" style="display: none;">
+                    <video id="regVideo" autoplay muted></video>
+                    <canvas id="regDetectionCanvas" class="detection-overlay"></canvas>
+                </div>
+
+                <div class="controls">
+                    <button class="btn" id="startCameraBtn" onclick="startRegistrationCamera()">
+                        📷 Start Camera
+                    </button>
+                    <button class="btn btn-secondary" id="capturePhotoBtn" onclick="capturePhoto()" style="display: none;" disabled>
+                        📸 Capture Face Data
+                    </button>
+                    <button class="btn btn-success" id="registerBtn" onclick="registerStudent()" disabled>
+                        ✅ Register Student
+                    </button>
+                    <button class="btn btn-danger" id="cancelRegBtn" onclick="cancelRegistration()" style="display: none;">
+                        ❌ Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="canvas" class="canvas"></canvas>
+        <canvas id="regCanvas" class="canvas"></canvas>
+
+        <div id="message" class="status-card" style="display: none;"></div>
+    </div>
+
+    <script>        
+        // Configuration
+        const CAMPUS_CENTER = { lat: 24.842822, lng: 93.939438 };
+        const CAMPUS_RADIUS = 3000; // 1000m for testing
+        const RECOGNITION_THRESHOLD = 0.6; // Face recognition confidence threshold
+        const DETECTION_INTERVAL = 100; // Face detection interval in ms
+
+        // Global variables
+        let faceApiLoaded = false;
+        let labeledFaceDescriptors = [];
+        let faceMatcher = null;
+        let currentStudent = null;
+        let locationVerified = false;
+        let cameraReady = false;
+        let stream = null;
+        let regStream = null;
+        let capturedFaceDescriptor = null;
+        let capturedPhotoData = null;
+        let detectionInterval = null;
+        let regDetectionInterval = null;
+
+        // Enhanced student database with face descriptors
+        let STUDENTS_DB = {};
+
+        // Initialize face-api.js models
+        async function loadFaceApiModels() {
+            try {
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+                
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+                ]);
+                
+                faceApiLoaded = true;
+                document.getElementById('modelsStatus').className = 'status-indicator status-success';
+                document.getElementById('loadingOverlay').style.display = 'none';
+                showMessage('✅ Face recognition models loaded successfully!', 'success');
+                return true;
+            } catch (error) {
+                console.error('Error loading face-api models:', error);
+                document.getElementById('modelsStatus').className = 'status-indicator status-error';
+                document.getElementById('loadingOverlay').style.display = 'none';
+                showMessage('❌ Failed to load face recognition models. Please refresh and try again.', 'error');
+                return false;
+            }
+        }
+
+        // Create labeled face descriptors for recognition
+        async function createLabeledFaceDescriptors() {
+            const descriptions = [];
+            
+            for (const [key, student] of Object.entries(STUDENTS_DB)) {
+                if (student.faceDescriptor) {
+                    descriptions.push(
+                        new faceapi.LabeledFaceDescriptors(
+                            student.name,
+                            [new Float32Array(student.faceDescriptor)]
+                        )
+                    );
+                }
+            }
+            
+            labeledFaceDescriptors = descriptions;
+            
+            if (descriptions.length > 0) {
+                faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, RECOGNITION_THRESHOLD);
+                console.log(`Created face matcher with ${descriptions.length} students`);
+            }
+        }
+
+        // Page switching
+        function switchPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.page-btn').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(page + 'Page').classList.add('active');
+            event.target.classList.add('active');
+            
+            if (page === 'register') {
+                updateStudentList();
+            } else {
+                resetSystem();
+            }
+            
+            document.getElementById('message').style.display = 'none';
+        }
+
+        // Initialize the attendance system
+        async function initializeSystem() {
+            if (!faceApiLoaded) {
+                showMessage('❌ Face recognition models not loaded. Please wait and try again.', 'error');
+                return;
+            }
+
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('startBtn').textContent = '⏳ Initializing...';
+            
+            await verifyLocation();
+            
+            if (locationVerified) {
+                await initializeCamera();
+            }
+            
+            updateUI();
+        }
+
+        // Verify location
+        async function verifyLocation() {
+            return new Promise((resolve) => {
+                if (!navigator.geolocation) {
+                    showMessage('Geolocation is not supported by this browser.', 'error');
+                    resolve();
+                    return;
+                }
+
+                document.getElementById('locationStatus').className = 'status-indicator status-pending';
+                
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const distance = calculateDistance(
+                            position.coords.latitude,
+                            position.coords.longitude,
+                            CAMPUS_CENTER.lat,
+                            CAMPUS_CENTER.lng
+                        );
+
+                        document.getElementById('distanceInfo').textContent = 
+                            `Distance from campus: ${Math.round(distance)}m`;
+
+                        if (distance <= CAMPUS_RADIUS) {
+                            locationVerified = true;
+                            document.getElementById('locationStatus').className = 'status-indicator status-success';
+                            showMessage('✅ Location verified! You are within campus bounds.', 'success');
+                        } else {
+                            document.getElementById('locationStatus').className = 'status-indicator status-error';
+                            showMessage('❌ You must be within campus to mark attendance.', 'error');
+                        }
+                        resolve();
+                    },
+                    (error) => {
+                        document.getElementById('locationStatus').className = 'status-indicator status-error';
+                        showMessage('Unable to verify location. Please enable location access.', 'error');
+                        resolve();
+                    },
+                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 600000 }
+                );
+            });
+        }
+
+        // Initialize camera for attendance
+        async function initializeCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 480, height: 360, facingMode: 'user' } 
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = async () => {
+                    cameraReady = true;
+                    document.getElementById('cameraStatus').className = 'status-indicator status-success';
+                    document.getElementById('videoContainer').style.display = 'block';
+                    
+                    // Setup detection canvas
+                    const canvas = document.getElementById('detectionCanvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    await createLabeledFaceDescriptors();
+                    startFaceDetection();
+                    
+                    showMessage('📷 Camera ready! Face detection active.', 'success');
+                };
+            } catch (error) {
+                document.getElementById('cameraStatus').className = 'status-indicator status-error';
+                showMessage('Unable to access camera. Please grant camera permission.', 'error');
+            }
+        }
+
+        // Start face detection for attendance
+        async function startFaceDetection() {
+            if (!faceApiLoaded || !cameraReady) return;
+
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('detectionCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            document.getElementById('recognitionStatus').style.display = 'block';
+
+            detectionInterval = setInterval(async () => {
+                try {
+                    const detections = await faceapi.detectAllFaces(
+                        video,
+                        new faceapi.TinyFaceDetectorOptions()
+                    ).withFaceLandmarks().withFaceDescriptors();
+
+                    // Clear previous drawings
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    if (detections.length > 0) {
+                        // Draw face detections
+                        detections.forEach((detection, i) => {
+                            const { x, y, width, height } = detection.detection.box;
+                            
+                            // Draw bounding box
+                            ctx.strokeStyle = '#00ff00';
+                            ctx.lineWidth = 3;
+                            ctx.strokeRect(x, y, width, height);
+
+                            // Face recognition
+                            if (faceMatcher && labeledFaceDescriptors.length > 0) {
+                                const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+                                
+                                // Draw label
+                                ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+                                ctx.fillRect(x, y - 35, width, 30);
+                                
+                                ctx.fillStyle = 'white';
+                                ctx.font = '16px Arial';
+                                ctx.textAlign = 'center';
+                                
+                                if (bestMatch.distance < RECOGNITION_THRESHOLD) {
+                                    const confidence = Math.round((1 - bestMatch.distance) * 100);
+                                    ctx.fillText(`${bestMatch.label} (${confidence}%)`, x + width/2, y - 10);
+                                    
+                                    // Enable attendance button for recognized face
+                                    if (confidence > 70) {
+                                        document.getElementById('markAttendanceBtn').disabled = false;
+                                        document.getElementById('recognitionStatus').className = 'recognition-status recognition-success';
+                                        document.getElementById('recognitionStatus').textContent = 
+                                            `✅ Face recognized: ${bestMatch.label} (${confidence}% confidence)`;
+                                        
+                                        // Store current detection for attendance
+                                        currentStudent = Object.values(STUDENTS_DB).find(s => s.name === bestMatch.label);
+                                    }
+                                } else {
+                                    ctx.fillText('Unknown', x + width/2, y - 10);
+                                    document.getElementById('recognitionStatus').className = 'recognition-status recognition-failed';
+                                    document.getElementById('recognitionStatus').textContent = '❌ Face not recognized';
+                                }
+                            }
+                        });
+                    } else {
+                        document.getElementById('recognitionStatus').className = 'recognition-status recognition-processing';
+                        document.getElementById('recognitionStatus').textContent = '🔍 No face detected - please position yourself in front of the camera';
+                        document.getElementById('markAttendanceBtn').disabled = true;
+                    }
+                } catch (error) {
+                    console.error('Detection error:', error);
+                }
+            }, DETECTION_INTERVAL);
+        }
+
+        // Start registration camera
+        async function startRegistrationCamera() {
+            try {
+                regStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 480, height: 360, facingMode: 'user' } 
+                });
+                
+                const video = document.getElementById('regVideo');
+                video.srcObject = regStream;
+                
+                video.onloadedmetadata = () => {
+                    document.getElementById('regVideoContainer').style.display = 'block';
+                    document.getElementById('startCameraBtn').style.display = 'none';
+                    document.getElementById('capturePhotoBtn').style.display = 'inline-block';
+                    document.getElementById('cancelRegBtn').style.display = 'inline-block';
+                    
+                    // Setup detection canvas
+                    const canvas = document.getElementById('regDetectionCanvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    startRegistrationDetection();
+                    showMessage('📷 Camera ready! Position your face for capture.', 'success');
+                };
+            } catch (error) {
+                showMessage('Unable to access camera. Please grant camera permission.', 'error');
+            }
+        }
+
+        // Start face detection for registration
+        async function startRegistrationDetection() {
+            if (!faceApiLoaded) return;
+
+            const video = document.getElementById('regVideo');
+            const canvas = document.getElementById('regDetectionCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            document.getElementById('regRecognitionStatus').style.display = 'block';
+
+            regDetectionInterval = setInterval(async () => {
+                try {
+                    const detections = await faceapi.detectAllFaces(
+                        video,
+                        new faceapi.TinyFaceDetectorOptions()
+                    ).withFaceLandmarks().withFaceDescriptors();
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    if (detections.length === 1) {
+                        const detection = detections[0];
+                        const { x, y, width, height } = detection.detection.box;
+                        
+                        // Draw green box for good detection
+                        ctx.strokeStyle = '#00ff00';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(x, y, width, height);
+                        
+                        // Check face quality (size and position)
+                        const faceSize = width * height;
+                        const videoSize = video.videoWidth * video.videoHeight;
+                        const faceRatio = faceSize / videoSize;
+                        
+                        if (faceRatio > 0.1 && faceRatio < 0.6) {
+                            document.getElementById('capturePhotoBtn').disabled = false;
+                            document.getElementById('regRecognitionStatus').className = 'recognition-status recognition-success';
+                            document.getElementById('regRecognitionStatus').textContent = '✅ Good face detection! Ready to capture.';
+                        } else {
+                            document.getElementById('capturePhotoBtn').disabled = true;
+                            document.getElementById('regRecognitionStatus').className = 'recognition-status recognition-processing';
+                            document.getElementById('regRecognitionStatus').textContent = '🔍 Please adjust distance - move closer or further from camera';
+                        }
+                    } else if (detections.length > 1) {
+                        document.getElementById('capturePhotoBtn').disabled = true;
+                        document.getElementById('regRecognitionStatus').className = 'recognition-status recognition-failed';
+                        document.getElementById('regRecognitionStatus').textContent = '👥 Multiple faces detected! Please ensure only one person is visible.';
+                    } else {
+                        document.getElementById('capturePhotoBtn').disabled = true;
+                        document.getElementById('regRecognitionStatus').className = 'recognition-status recognition-processing';
+                        document.getElementById('regRecognitionStatus').textContent = '🔍 No face detected - please position yourself in front of camera';
+                    }
+                } catch (error) {
+                    console.error('Registration detection error:', error);
+                }
+            }, DETECTION_INTERVAL);
+        }
+
+        // Capture photo during registration
+        async function capturePhoto() {
+            const video = document.getElementById('regVideo');
+            const canvas = document.getElementById('regCanvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Save photo data
+            capturedPhotoData = canvas.toDataURL('image/png');
+
+            // Extract face descriptor
+            const detections = await faceapi.detectSingleFace(
+                video,
+                new faceapi.TinyFaceDetectorOptions()
+            ).withFaceLandmarks().withFaceDescriptor();
+
+            if (detections) {
+                capturedFaceDescriptor = Array.from(detections.descriptor);
+                document.getElementById('photoPreview').innerHTML = `<img src="${capturedPhotoData}"/>`;
+                document.getElementById('registerBtn').disabled = false;
+                showMessage('✅ Face captured successfully! Now click "Register Student".', 'success');
+            } else {
+                showMessage('❌ No valid face captured. Please try again.', 'error');
+            }
+        }
+
+        // Register new student
+        function registerStudent() {
+            const name = document.getElementById('studentNameInput').value.trim();
+            const id = document.getElementById('studentIdInput').value.trim();
+            const email = document.getElementById('emailInput').value.trim();
+
+            if (!name || !id || !capturedFaceDescriptor || !capturedPhotoData) {
+                showMessage('❌ Please fill details and capture your face first.', 'error');
+                return;
+            }
+
+            // Check if student ID already exists
+            if (STUDENTS_DB[id]) {
+                showMessage('❌ Student ID already exists. Please use a different ID.', 'error');
+                return;
+            }
+
+            STUDENTS_DB[id] = {
+                id,
+                name,
+                email,
+                faceDescriptor: capturedFaceDescriptor,
+                photo: capturedPhotoData,
+                attendance: []
+            };
+
+            saveDB();
+            updateStudentList();
+            resetRegistration();
+            showMessage(`✅ Student ${name} registered successfully!`, 'success');
+        }
+
+        // Mark attendance
+        function markAttendance() {
+            if (!currentStudent) return;
+
+            const now = new Date();
+            currentStudent.attendance.push({
+                timestamp: now.toISOString(),
+                date: now.toDateString(),
+                time: now.toLocaleTimeString()
+            });
+
+            saveDB();
+            document.getElementById('markAttendanceBtn').disabled = true;
+            
+            // Show student info
+            showStudentInfo(currentStudent);
+            
+            showMessage(`✅ Attendance marked for ${currentStudent.name} at ${now.toLocaleString()}`, 'success');
+        }
+
+        // Show student information
+        function showStudentInfo(student) {
+            const studentInfo = document.getElementById('studentInfo');
+            const studentPhoto = document.getElementById('studentPhoto');
+            const studentName = document.getElementById('studentName');
+            const studentId = document.getElementById('studentId');
+
+            studentPhoto.innerHTML = `<img src="${student.photo}" alt="${student.name}"/>`;
+            studentName.textContent = student.name;
+            studentId.textContent = `Student ID: ${student.id}`;
+            
+            studentInfo.style.display = 'block';
+            studentInfo.classList.add('success-animation');
+            
+            setTimeout(() => {
+                studentInfo.classList.remove('success-animation');
+            }, 600);
+        }
+
+        // Cancel / Reset registration
+        function cancelRegistration() {
+            resetRegistration();
+            showMessage('❌ Registration cancelled.', 'error');
+        }
+
+        function resetRegistration() {
+            if (regStream) {
+                regStream.getTracks().forEach(track => track.stop());
+                regStream = null;
+            }
+            clearInterval(regDetectionInterval);
+
+            document.getElementById('regVideoContainer').style.display = 'none';
+            document.getElementById('startCameraBtn').style.display = 'inline-block';
+            document.getElementById('capturePhotoBtn').style.display = 'none';
+            document.getElementById('cancelRegBtn').style.display = 'none';
+            document.getElementById('regRecognitionStatus').style.display = 'none';
+
+            document.getElementById('studentNameInput').value = '';
+            document.getElementById('studentIdInput').value = '';
+            document.getElementById('emailInput').value = '';
+            document.getElementById('photoPreview').innerHTML = '📷';
+            document.getElementById('registerBtn').disabled = true;
+            capturedFaceDescriptor = null;
+            capturedPhotoData = null;
+        }
+
+        // Reset attendance system
+        function resetSystem() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            clearInterval(detectionInterval);
+            
+            cameraReady = false;
+            locationVerified = false;
+            currentStudent = null;
+
+            // Reset UI elements
+            document.getElementById('videoContainer').style.display = 'none';
+            document.getElementById('recognitionStatus').style.display = 'none';
+            document.getElementById('studentInfo').style.display = 'none';
+            document.getElementById('markAttendanceBtn').style.display = 'none';
+            document.getElementById('resetBtn').style.display = 'none';
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').textContent = '🚀 Start Attendance System';
+            
+            // Reset status indicators
+            document.getElementById('locationStatus').className = 'status-indicator status-pending';
+            document.getElementById('cameraStatus').className = 'status-indicator status-pending';
+            document.getElementById('distanceInfo').textContent = '';
+        }
+
+        // Update UI after initialization
+        function updateUI() {
+            if (locationVerified && cameraReady) {
+                document.getElementById('markAttendanceBtn').style.display = 'inline-block';
+                document.getElementById('resetBtn').style.display = 'inline-block';
+                document.getElementById('startBtn').style.display = 'none';
+            } else {
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('startBtn').textContent = '🚀 Start Attendance System';
+            }
+        }
+
+        // Database helpers - Using memory storage instead of localStorage
+        let dbStorage = {};
+
+        function saveDB() {
+            // Store in memory instead of localStorage for artifact compatibility
+            dbStorage.studentsDB = JSON.stringify(STUDENTS_DB);
+            console.log('Database saved to memory');
+        }
+
+        function loadDB() {
+            // Load from memory instead of localStorage for artifact compatibility
+            if (dbStorage.studentsDB) {
+                STUDENTS_DB = JSON.parse(dbStorage.studentsDB);
+                console.log('Database loaded from memory');
+            }
+        }
+
+        // Update student list (register page)
+        function updateStudentList() {
+            const list = document.getElementById('studentList');
+            const count = Object.keys(STUDENTS_DB).length;
+            
+            list.innerHTML = '';
+            
+            if (count === 0) {
+                list.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No students registered yet</p>';
+            } else {
+                Object.values(STUDENTS_DB).forEach(student => {
+                    const div = document.createElement('div');
+                    div.className = 'student-item';
+                    div.innerHTML = `
+                        <div class="student-item-photo">
+                            <img src="${student.photo}" alt="${student.name}"/>
+                        </div>
+                        <div>
+                            <strong>${student.name}</strong><br/>
+                            <small>ID: ${student.id}</small><br/>
+                            <small>Attendance: ${student.attendance.length} times</small>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+            
+            document.getElementById('studentCount').textContent = count;
+        }
+
+        // Utility: Distance between two coordinates using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth's radius in meters
+            const toRad = (x) => (x * Math.PI) / 180;
+            
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                      
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // Show messages to user
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.style.display = 'block';
+            msg.textContent = text;
+            msg.className = `status-card ${type === 'success' ? 'success' : type === 'error' ? 'error' : ''}`;
+            
+            // Auto-hide success messages after 300 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    msg.style.display = 'none';
+                }, 300000);
+            }
+        }
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                // Pause detection when tab is not visible to save resources
+                if (detectionInterval) {
+                    clearInterval(detectionInterval);
+                }
+                if (regDetectionInterval) {
+                    clearInterval(regDetectionInterval);
+                }
+            } else {
+                // Resume detection when tab becomes visible
+                if (cameraReady && faceApiLoaded) {
+                    startFaceDetection();
+                }
+                if (regStream && faceApiLoaded) {
+                    startRegistrationDetection();
+                }
+            }
+        });
+
+        // Clean up resources before page unload
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (regStream) {
+                regStream.getTracks().forEach(track => track.stop());
+            }
+            clearInterval(detectionInterval);
+            clearInterval(regDetectionInterval);
+        });
+
+        // Initialize application on load
+        window.addEventListener('load', async () => {
+            console.log('Initializing Face Recognition Attendance System...');
+            loadDB();
+            await loadFaceApiModels();
+            updateStudentList();
+            console.log('System ready!');
+        });
+    </script>
+</body>
+</html>
